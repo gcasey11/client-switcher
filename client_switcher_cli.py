@@ -25,7 +25,7 @@ except subprocess.CalledProcessError:
 ############# CLI CODE #######################
 
 # Define valid execution clients and networks
-valid_clients = ['GETH', 'BESU', 'NETHERMIND', 'NONE']
+valid_clients = ['GETH', 'BESU', 'NETHERMIND', 'ERIGON', 'NONE']
 valid_networks = ['MAINNET', 'GOERLI', 'SEPOLIA', 'HOLESKY']
 
 # Ask the user for Ethereum network
@@ -45,7 +45,7 @@ while execution_client_delete not in valid_clients:
 # Ask the user for the execution client to INSTALL
 execution_client_install = ""
 while execution_client_install not in valid_clients:
-    execution_client_install = input("\n3) Select Execution Client to INSTALL (geth, besu, nethermind, none): ").upper()
+    execution_client_install = input("\n3) Select Execution Client to INSTALL (geth, besu, nethermind, erigon, none): ").upper()
     if execution_client_install not in valid_clients:
         print("Invalid option, please try again.")
 
@@ -69,7 +69,7 @@ print(f"Execution Client to INSTALL: {execution_client_install}\n")
 ######## VALIDATE USER INPUTS #########################
 
 # Define valid execution clients and networks in uppercase
-valid_clients = ['GETH', 'BESU', 'NETHERMIND', 'NONE']
+valid_clients = ['GETH', 'BESU', 'NETHERMIND', 'ERIGON', 'NONE']
 valid_networks = ['MAINNET', 'GOERLI', 'SEPOLIA', 'HOLESKY']
 
 # Convert user inputs to uppercase
@@ -81,7 +81,7 @@ execution_client_install = execution_client_install.upper()
 if eth_network not in valid_networks:
     raise ValueError(f"Invalid Ethereum Network: {eth_network}")
 
-if execution_client_delete not in valid_clients:
+if execution_client_delete not in valid_clients or execution_client_delete == 'ERIGON':
     raise ValueError(f"Invalid Execution Client to DELETE: {execution_client_delete}")
 
 if execution_client_install not in valid_clients:
@@ -224,6 +224,7 @@ if execution_client_install == 'besu':
 	with tarfile.open(f"besu-{latest_version}.tar.gz", "r:gz") as tar:
 	    tar.extractall()
 
+if execution_client_install == 'besu':
 	# Copy the extracted besu folder to /usr/local/bin/besu
 	subprocess.run(["sudo", "cp", "-a", f"besu-{latest_version}", "/usr/local/bin/besu"], check=True)
 
@@ -290,7 +291,60 @@ if execution_client_install == 'nethermind':
     # Remove the temporary zip file
     os.remove(temp_path)
 
-    nethermind_version = os.path.splitext(zip_filename)[0]    
+    nethermind_version = os.path.splitext(zip_filename)[0]
+
+###### ERIGON INSTALL ################
+if execution_client_install == 'erigon':
+          # Create User and directories (assuming not already created)
+    subprocess.run(["sudo", "useradd", "--no-create-home", "--shell", "/bin/false", "erigon"], check=True)
+    subprocess.run(["sudo", "mkdir", "-p", "/var/lib/erigon"], check=True)
+    subprocess.run(["sudo", "chown", "-R", "erigon:erigon", "/var/lib/erigon"], check=True)
+
+    # Define the Github API endpoint to get the latest release
+    url = 'https://api.github.com/repos/ledgerwatch/erigon/releases/latest'
+
+    # Send a GET request to the API endpoint
+    response = requests.get(url)
+
+    # Search for the asset with the name that ends in linux-x64.tar.gz
+    assets = response.json()['assets']
+    download_url = None
+    archive_filename = None
+    for asset in assets:
+        if asset['name'].endswith('linux-x64.tar.gz'):
+            download_url = asset['browser_download_url']
+            archive_filename = asset['name']
+            break
+
+    if download_url is None or archive_filename is None:
+        print("Error: Could not find the download URL for the latest release.")
+        exit(1)
+
+    # Download the latest release archive
+    response = requests.get(download_url)
+
+    # Save the archive to a temporary file
+    with tempfile.NamedTemporaryFile('wb', suffix='.tar.gz', delete=False) as temp_file:
+        temp_file.write(response.content)
+        temp_path = temp_file.name
+
+    # Create a temporary directory for extraction
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Extract the archive to the temporary directory
+        with tarfile.open(temp_path, 'r:gz') as tar_ref:
+            tar_ref.extractall(temp_dir)
+
+        # Move the extracted Erigon binary to /usr/local/bin/erigon with sudo (assuming it's named erigon)
+        subprocess.run(["sudo", "mv", f"{temp_dir}/erigon", "/usr/local/bin/erigon"], check=True)
+
+    # chown erigon:erigon /usr/local/bin/erigon
+    subprocess.run(["sudo", "chown", "erigon:erigon", "/usr/local/bin/erigon"], check=True)
+
+    # chmod a+x /usr/local/bin/erigon
+    subprocess.run(["sudo", "chmod", "a+x", "/usr/local/bin/erigon"], check=True)
+
+    # Remove the temporary archive file
+    os.remove(temp_path)
  
 ###### GETH SERVICE FILE #############
 if execution_client_install == 'geth':
@@ -401,6 +455,44 @@ if execution_client_install == 'nethermind':
     os.system(f'sudo cp {nethermind_temp_file} {nethermind_service_file_path}')
 
     os.remove(nethermind_temp_file)
+
+##### ERIGON SERVICE FILE ######
+if execution_client_install == 'erigon':
+    erigon_service_file_lines = [
+        '[Unit]',
+        'Description=Erigon Execution Client (Mainnet)',
+        'Wants=network.target',
+        'After=network.target',
+        '',
+        '[Service]',
+        'User=erigon',
+        'Group=erigon',
+        'Type=simple',
+        'Restart=always',
+        'RestartSec=5',
+        'WorkingDirectory=/var/lib/erigon',
+        'Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/erigon"',
+        'ExecStart=/usr/local/bin/erigon/erigon \\',
+        f'    --config {eth_network.lower()} \\',
+        '    --datadir /var/lib/erigon \\',
+        '    --Sync.SnapSync true \\',
+        '    --JsonRpc.JwtSecretFile /var/lib/jwtsecret/jwt.hex',
+        '',
+        '[Install]',
+        'WantedBy=default.target',
+    ]
+
+    erigon_service_file = '\n'.join(erigon_service_file_lines)
+
+    erigon_temp_file = 'erigon_temp.service'
+    erigon_service_file_path = '/etc/systemd/system/erigon.service'
+
+    with open(erigon_temp_file, 'w') as f:
+        f.write(erigon_service_file)
+
+    os.system(f'sudo cp {erigon_temp_file} {erigon_service_file_path}')
+
+    os.remove(erigon_temp_file)
 
 #### END SERVICE FILES #####
 

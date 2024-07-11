@@ -701,6 +701,7 @@ if execution_client_install == 'besu':
 	with tarfile.open(f"besu-{latest_version}.tar.gz", "r:gz") as tar:
 	    tar.extractall()
 
+if execution_client_install == 'besu':
 	# Copy the extracted besu folder to /usr/local/bin/besu
 	subprocess.run(["sudo", "cp", "-a", f"besu-{latest_version}", "/usr/local/bin/besu"], check=True)
 
@@ -1438,9 +1439,11 @@ if consensus_client_install == 'lighthouse':
     with open(lh_beacon_temp_file, 'w') as f:
 	    f.write(lh_beacon_service_file)
 
+if consensus_client_install == 'lighthouse':
     with open(lh_validator_temp_file, 'w') as f:
 	    f.write(lh_validator_service_file)
 
+if consensus_client_install == 'lighthouse':
     os.system(f'sudo cp {lh_beacon_temp_file} {lh_beacon_service_file_path}')
     os.system(f'sudo cp {lh_validator_temp_file} {lh_validator_service_file_path}')
     os.remove(lh_beacon_temp_file)
