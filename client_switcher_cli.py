@@ -311,7 +311,7 @@ if execution_client_install == 'erigon':
     download_url = None
     archive_filename = None
     for asset in assets:
-        if asset['name'].endswith('linux-x64.tar.gz'):
+        if asset['name'].endswith('linux_amd64.tar.gz'):
             download_url = asset['browser_download_url']
             archive_filename = asset['name']
             break
