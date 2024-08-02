@@ -296,9 +296,13 @@ if execution_client_install == 'nethermind':
 ###### ERIGON INSTALL ################
 if execution_client_install == 'erigon':
           # Create User and directories (assuming not already created)
-    subprocess.run(["sudo", "useradd", "--no-create-home", "--shell", "/bin/false", "erigon"], check=True)
-    subprocess.run(["sudo", "mkdir", "-p", "/var/lib/erigon"], check=True)
-    subprocess.run(["sudo", "chown", "-R", "erigon:erigon", "/var/lib/erigon"], check=True)
+    try:
+        subprocess.run(["sudo", "useradd", "--no-create-home", "--shell", "/bin/false", "erigon"], check=True)
+        subprocess.run(["sudo", "mkdir", "-p", "/var/lib/erigon"], check=True)
+        subprocess.run(["sudo", "chown", "-R", "erigon:erigon", "/var/lib/erigon"], check=True)
+    except:
+        print("User already added")
+        
 
     # Define the Github API endpoint to get the latest release
     url = 'https://api.github.com/repos/ledgerwatch/erigon/releases/latest'
