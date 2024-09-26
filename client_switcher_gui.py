@@ -12,6 +12,8 @@ import zipfile
 import tkinter as tk
 from tkinter import filedialog, font
 
+import redistribute_multifactor_distance
+
 # Change to the home folder
 os.chdir(os.path.expanduser("~"))
 
@@ -69,18 +71,37 @@ execution_delete_menu.config(bg="#2196F3", fg="#FFFFFF", activebackground="#64B5
 execution_delete_menu["menu"].config(bg="#2196F3", fg="#FFFFFF", activebackground="#64B5F6", activeforeground="#FFFFFF", font=label_font)
 execution_delete_menu.grid(column=1, row=1, padx=30, pady=30, ipadx=40, ipady=10)
 
+# Recommendation
+recommendation = redistribute_multifactor_distance.recommendation()
+receommended_exe_client = str(recommendation[0]).upper()
+receommended_con_client = str(recommendation[1]).upper()
+recommendation_text = "Based on our recommendation algorithm, to improve the diversity of the Ethereum network we recommend " + receommended_exe_client + " for your Execution Client."
+recommendation_text_2 = "Additionally, we recommend " + receommended_con_client + " for your Consensus Client."
+
+
+    
+recommended_label = tk.Label(
+    root,
+    text=recommendation_text+"\n"+recommendation_text_2,
+    bg="#282C34",
+    fg="#ABB2BF",
+    font=label_font,
+    anchor="center",
+)
+recommended_label.grid(column=0, row=2, columnspan=2, padx=30, pady=10)
+
 # Execution client selection (to install)
 execution_install_label = tk.Label(root, text="Execution Client to INSTALL:", bg="#282C34", fg="#ABB2BF", font=label_font, anchor='e')
-execution_install_label.grid(column=0, row=2, padx=30, pady=30, sticky='e')
+execution_install_label.grid(column=0, row=3, padx=30, pady=30, sticky='e')
 
 execution_install_menu = tk.OptionMenu(root, execution_install_var, *execution_clients)
 execution_install_menu.config(bg="#FF9800", fg="#FFFFFF", activebackground="#FFA726", activeforeground="#FFFFFF", font=label_font, takefocus=True)
 execution_install_menu["menu"].config(bg="#FF9800", fg="#FFFFFF", activebackground="#FFA726", activeforeground="#FFFFFF", font=label_font)
-execution_install_menu.grid(column=1, row=2, padx=30, pady=30, ipadx=40, ipady=10)
+execution_install_menu.grid(column=1, row=3, padx=30, pady=30, ipadx=40, ipady=10)
 
 # Submit button
 submit_button = tk.Button(root, text="Install", command=submit, bg="#282C34", fg="#ABB2BF", activebackground="#61AFEF", activeforeground="#282C34", font=label_font, takefocus=True)
-submit_button.grid(column=1, row=3, padx=30, pady=60)
+submit_button.grid(column=1, row=4, padx=30, pady=60)
 
 root.mainloop()
 
@@ -100,7 +121,7 @@ print(f"Execution Client to INSTALL: {execution_client_install}\n")
 ######## VALIDATE USER INPUTS #########################
 
 # Define valid execution clients and networks in uppercase
-valid_clients = ['GETH', 'BESU', 'NETHERMIND', 'NONE']
+valid_clients = ['GETH', 'BESU', 'NETHERMIND', 'ERIGON' 'NONE']
 valid_networks = ['MAINNET', 'GOERLI', 'SEPOLIA', 'HOLESKY']
 
 # Convert user inputs to uppercase
@@ -325,7 +346,64 @@ if execution_client_install == 'nethermind':
     # Remove the temporary zip file
     os.remove(temp_path)
 
-    nethermind_version = os.path.splitext(zip_filename)[0]    
+    nethermind_version = os.path.splitext(zip_filename)[0]  
+
+###### ERIGON INSTALL ################
+if execution_client_install == 'erigon':
+    # Create User and directories (assuming not already created)
+    try:
+        subprocess.run(["sudo", "useradd", "--no-create-home", "--shell", "/bin/false", "erigon"], check=True)
+        subprocess.run(["sudo", "mkdir", "-p", "/var/lib/erigon"], check=True)
+        subprocess.run(["sudo", "chown", "-R", "erigon:erigon", "/var/lib/erigon"], check=True)
+    except:
+        print("User already added")
+        
+
+    # Define the Github API endpoint to get the latest release
+    url = 'https://api.github.com/repos/ledgerwatch/erigon/releases/latest'
+
+    # Send a GET request to the API endpoint
+    response = requests.get(url)
+
+    # Search for the asset with the name that ends in linux-x64.tar.gz
+    assets = response.json()['assets']
+    download_url = None
+    archive_filename = None
+    for asset in assets:
+        if asset['name'].endswith('linux_amd64.tar.gz'):
+            download_url = asset['browser_download_url']
+            archive_filename = asset['name']
+            break
+
+    if download_url is None or archive_filename is None:
+        print("Error: Could not find the download URL for the latest release.")
+        exit(1)
+
+    # Download the latest release archive
+    response = requests.get(download_url)
+
+    # Save the archive to a temporary file
+    with tempfile.NamedTemporaryFile('wb', suffix='.tar.gz', delete=False) as temp_file:
+        temp_file.write(response.content)
+        temp_path = temp_file.name
+
+    # Create a temporary directory for extraction
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Extract the archive to the temporary directory
+        with tarfile.open(temp_path, 'r:gz') as tar_ref:
+            tar_ref.extractall(temp_dir)
+
+        # Move the extracted Erigon binary to /usr/local/bin/erigon with sudo (assuming it's named erigon)
+        subprocess.run(["sudo", "mv", f"{temp_dir}/erigon", "/usr/local/bin/erigon"], check=True)
+
+    # chown erigon:erigon /usr/local/bin/erigon
+    subprocess.run(["sudo", "chown", "erigon:erigon", "/usr/local/bin/erigon"], check=True)
+
+    # chmod a+x /usr/local/bin/erigon
+    subprocess.run(["sudo", "chmod", "a+x", "/usr/local/bin/erigon"], check=True)
+
+    # Remove the temporary archive file
+    os.remove(temp_path)  
  
 ###### GETH SERVICE FILE #############
 if execution_client_install == 'geth':
@@ -438,6 +516,44 @@ if execution_client_install == 'nethermind':
     os.system(f'sudo cp {nethermind_temp_file} {nethermind_service_file_path}')
 
     os.remove(nethermind_temp_file)
+
+##### ERIGON SERVICE FILE ######
+if execution_client_install == 'erigon':
+    erigon_service_file_lines = [
+        '[Unit]',
+        'Description=Erigon Execution Client (Mainnet)',
+        'Wants=network.target',
+        'After=network.target',
+        '',
+        '[Service]',
+        'User=erigon',
+        'Group=erigon',
+        'Type=simple',
+        'Restart=always',
+        'RestartSec=5',
+        'WorkingDirectory=/var/lib/erigon',
+        'Environment="DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/erigon"',
+        'ExecStart=/usr/local/bin/erigon/erigon \\',
+        f'    --config {eth_network.lower()} \\',
+        '    --datadir /var/lib/erigon \\',
+        '    --Sync.SnapSync true \\',
+        '    --JsonRpc.JwtSecretFile /var/lib/jwtsecret/jwt.hex',
+        '',
+        '[Install]',
+        'WantedBy=default.target',
+    ]
+
+    erigon_service_file = '\n'.join(erigon_service_file_lines)
+
+    erigon_temp_file = 'erigon_temp.service'
+    erigon_service_file_path = '/etc/systemd/system/erigon.service'
+
+    with open(erigon_temp_file, 'w') as f:
+        f.write(erigon_service_file)
+
+    os.system(f'sudo cp {erigon_temp_file} {erigon_service_file_path}')
+
+    os.remove(erigon_temp_file)
 
 #### END SERVICE FILES #####
 

@@ -10,6 +10,8 @@ import tempfile
 import urllib.request
 import zipfile
 
+import redistribute_multifactor_distance
+
 # Change to the home folder
 os.chdir(os.path.expanduser("~"))
 
@@ -45,6 +47,10 @@ while execution_client_delete not in valid_clients:
 # Ask the user for the execution client to INSTALL
 execution_client_install = ""
 while execution_client_install not in valid_clients:
+    recommendation = redistribute_multifactor_distance.recommendation()
+    receommended_exe_client = str(recommendation[0]).upper()
+    receommended_con_client = str(recommendation[1]).upper()
+    print("\nBased on our recommendation algorithm, to improve the diversity of the Ethereum network we recommend", receommended_exe_client, "for your Execution Client, and", receommended_con_client, "for your Consensus Client.")
     execution_client_install = input("\n3) Select Execution Client to INSTALL (geth, besu, nethermind, erigon, none): ").upper()
     if execution_client_install not in valid_clients:
         print("Invalid option, please try again.")
