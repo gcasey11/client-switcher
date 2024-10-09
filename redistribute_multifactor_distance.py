@@ -8,13 +8,13 @@ import web_scraper
 # This recommendation program is focused on selecting clients and dependencies that have a percentage share that is furthest below 33%.
 
 #Should these be weighted based on how low the entropy currently is? Or based on how vulnerable they are?
-LANGUAGE_WEIGHT = 1
-DB_WEIGHT = 1
-CRYPTO_WEIGHT = 1
-TEAM_WEIGHT =1
+LANGUAGE_WEIGHT = 0.5
+DB_WEIGHT = 0.6
+CRYPTO_WEIGHT = 0.8
+TEAM_WEIGHT =0.3
 CLIENT_WEIGHT = 1
 
-INITIAL_TOTAL_NODES = 15000
+INITIAL_TOTAL_NODES = 13900
 initial_dist = web_scraper.get_execution_dist()
 
 geth_nodes = initial_dist["Geth"] * INITIAL_TOTAL_NODES
@@ -58,11 +58,19 @@ def get_distance(name, distribution):
         total_types+=1
 
     fraction_of_dist = distribution[name]/total_nodes
+    # print("Fraction of dist", fraction_of_dist)
 
     if total_types < 3:
         distance_score = (1/total_types) - fraction_of_dist
+        if distance_score > 0:
+            return 0
     else:
         distance_score = 1/3 - fraction_of_dist
+        if distance_score > 0:
+            return 0
+        
+    # print("Distance score", distance_score)
+        
 
     return distance_score
 
@@ -115,8 +123,8 @@ def evaluate(name_of_client, clients):
 
     client_dist, language_dist, db_dist, crypto_dist, team_dist = create_distributions(clients)
 
-    total_distance = get_distance(clients[name_of_client]["name"], client_dist) + get_distance(clients[name_of_client]["language"], language_dist) + get_distance(clients[name_of_client]["db"], db_dist) + get_distance(clients[name_of_client]["crypto"], crypto_dist) + get_distance(clients[name_of_client]["team"], team_dist)
-
+    total_distance = get_distance(clients[name_of_client]["name"], client_dist) * CLIENT_WEIGHT + get_distance(clients[name_of_client]["language"], language_dist) * LANGUAGE_WEIGHT + get_distance(clients[name_of_client]["db"], db_dist) * DB_WEIGHT + get_distance(clients[name_of_client]["crypto"], crypto_dist) * CRYPTO_WEIGHT + get_distance(clients[name_of_client]["team"], team_dist) * TEAM_WEIGHT
+    # total_distance = get_distance(clients[name_of_client]["db"], db_dist)
     return total_distance
 
 
@@ -128,7 +136,7 @@ def recommendation():
 
     sorted_distances = dict(sorted(distances.items(), key=lambda item: item[1], reverse=True))
 
-    # If the difference in improvement between the first and second option is equal, decide based on attack surface instead
+    #If the difference in improvement between the first and second option is equal, decide based on attack surface instead
     i = 1
     equal_clients = {list(sorted_distances.keys())[0] : get_attack_surface_score(execution_clients[list(sorted_distances.keys())[0][0]], consensus_clients[list(sorted_distances.keys())[0][1]])}
     while i < len(list(sorted_distances.keys())):
@@ -147,74 +155,3 @@ def recommendation():
         file.write("Distribution" + "\n")
     
     return max(distances, key=distances.get)
-
-# start = time.time()
-
-# i = 0
-# while i <= 7500:
-#     if i == 0:
-#         total = 0
-#         for client in execution_clients:
-#             total += execution_clients[client]['distribution']
-
-#         print("Total is", total)
-
-#     random_choice = random.choices(execution_consensus_pairs)[0]
-
-#     value = random.randint(0,100)
-#     if value > 1:
-#         execution_clients[random_choice[0]]['distribution'] -= 1
-#         consensus_clients[random_choice[1]]['distribution'] -= 1
-
-
-#     recommended = recommendation()
-#     execution_clients[recommended[0]]['distribution'] += 1
-#     consensus_clients[recommended[1]]['distribution'] += 1
-
-#     if i == 7500:
-#         client_dist, language_dist, db_dist, crypto_dist, team_dist = create_distributions(execution_clients)
-#         consensus_client_dist, consensus_language_dist, consensus_db_dist, consensus_crypto_dist, consensus_team_dist = create_distributions(consensus_clients)
-        
-#         plt.figure(0)
-#         plt.subplot(211)
-#         pie_charts.create_pie(list(client_dist.values()), list(client_dist.keys()))
-#         plt.subplot(212)
-#         pie_charts.create_pie(list(consensus_client_dist.values()), list(consensus_client_dist.keys()))
-
-#         plt.figure(1)
-#         plt.subplot(211)
-#         pie_charts.create_pie(list(language_dist.values()), list(language_dist.keys()))
-#         plt.subplot(212)
-#         pie_charts.create_pie(list(consensus_language_dist.values()), list(consensus_language_dist.keys()))
-
-#         plt.figure(2)
-#         plt.subplot(211)
-#         pie_charts.create_pie(list(db_dist.values()), list(db_dist.keys()))
-#         plt.subplot(212)
-#         pie_charts.create_pie(list(consensus_db_dist.values()), list(consensus_db_dist.keys()))
-
-#         plt.figure(3)
-#         plt.subplot(211)
-#         pie_charts.create_pie(list(crypto_dist.values()), list(crypto_dist.keys()))
-#         plt.subplot(212)
-#         pie_charts.create_pie(list(consensus_crypto_dist.values()), list(consensus_crypto_dist.keys()))
-
-#         plt.figure(4)
-#         plt.subplot(211)
-#         pie_charts.create_pie(list(team_dist.values()), list(team_dist.keys()))
-#         plt.subplot(212)
-#         pie_charts.create_pie(list(consensus_team_dist.values()), list(consensus_team_dist.keys()))
-
-#         plt.show()
-
-#         total = 0
-#         for client in execution_clients:
-#             total += execution_clients[client]['distribution']
-
-#         print("Total is", total)
-
-#     i+=1
-
-# end = time.time()
-
-# print("Time", str(end-start))
